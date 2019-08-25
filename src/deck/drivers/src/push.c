@@ -10,6 +10,7 @@
 
 #include "debug.h"
 #include "log.h"
+#include "param.h"
 
 #define DEBUG_MODULE "PUSH"
 
@@ -231,7 +232,7 @@ static void sequenceTask()
         commanderSetSetpoint(&setpoint, 3);
       }
 
-      if (height < landing_height && up < 100 && up > 50) {
+      if (up < 80 && up > 0) {
         state = stopping;
         DEBUG_PRINT("STOPPED BY UP SENSOR\n");
       }
@@ -284,6 +285,11 @@ const DeckDriver sequence_deck = {
   .test = sequenceTest,
 };
 
+
+
 DECK_DRIVER(sequence_deck);
 
+PARAM_GROUP_START(deck)
+PARAM_ADD(PARAM_FLOAT, height, &height_sp)
+PARAM_GROUP_STOP(deck)
 
