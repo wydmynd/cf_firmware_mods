@@ -73,21 +73,21 @@ static uint16_t back = 0;
 static uint16_t left = 0;
 static uint16_t right = 0;
 
-static uint16_t up_o = 0;
+static float up_o = 500;
 //static uint16_t down_o = 0;
 static uint16_t front_o = 0;
 static uint16_t back_o = 0;
 static uint16_t left_o = 0;
 static uint16_t right_o = 0;
 
-static const float velMax = 0.35f;
+static const float velMax = 0.4f;
 
 static const uint16_t radius = 350;
 //static const uint16_t frontCollision = 190;
 //static const uint16_t rightCollision = 180;
 
-static const float landing_height = 0.12f;
-static const float height_sp = 0.35f;
+static const float landing_height = 0.15f;
+static float height_sp = 0.7f; //was const , changed so can be updated via param
 
 static float factor = 0;
 static float max_bias = 0.25f;
@@ -132,7 +132,7 @@ static void sequenceTask()
   DEBUG_PRINT("Waiting for activation ...\n");
 
   while(1) {
-    vTaskDelay(M2T(40));
+    vTaskDelay(M2T(25));
     //DEBUG_PRINT(".");
     up = logGetUint(idUp);
     if (state == unlocked) {
@@ -154,76 +154,8 @@ static void sequenceTask()
       b_comp = back_o * factor;
       velFront = b_comp + f_comp;
 
-      //up_o = radius - MIN(up, radius);
-      height = height_sp; // - up_o/1000.0f;
-
-
-      yawSpeed = 0;
-
-      if (mode == obstacle ) {
-    	  yawSpeed = 60.0;
-    	  if (xTaskGetTickCount() - obst_time > 1000 ) {
-    		  mode = running;
-    	  }
-      }
-
-      if (mode == scanning ) {
-    	  yawSpeed = -60.0;
-
-    	  if (xTaskGetTickCount() - scan_time > scanTimer ) {
-    		  bias=0.2;
-    		  mode = forward;
-    	  }
-      }
-
-      if (mode == forward ) {
-
-    	  if (xTaskGetTickCount() - scan_time > scanTimer+750 ) {
-    		  yawSpeed = -10.0;
-        	  if (bias < max_bias) {
-        		    bias=bias + 0.006f ; // * 1.05;
-        	  }
-    		  mode = running;
-    	  }
-      }
-
-      if (mode == running) {
-          if (front > radius) {
-        	  if (bias < max_bias) {
-        		    bias=bias + 0.0055f ; // * 1.05;
-        	  }
-
-
-        	  if (right > radius+150) {
-        		  scan_time = xTaskGetTickCount();
-        		  //right_o = MIN(right+150, 1000);
-        		  //scanTimer = right_o/1000 * 500; //set scan time proportional to distance on right
-        		  if (right > 850){
-        			  bias=0.05;
-        			  scanTimer=600;
-        		  }
-        		  else {
-        			  bias=0.2;
-        			  scanTimer=250;
-        		  }
-        		  mode = scanning;
-        	  }
-        	  else {
-        		  yawSpeed= 0;
-        	  }
-          }
-          else {
-
-        	  obst_time = xTaskGetTickCount();
-        	  bias=0.0;
-        	  mode = obstacle;
-
-          }
-      }
-
-
-      velFront += bias;
-
+      up_o = 0.2 * up + 0.8 * up_o;
+      height = height_sp; // - up_o/400.0f;
 
       //DEBUG_PRINT("collision f=%i, l=%i, r=%i, f_vel=%f, yaw=%f\n", front, left, right, velFront, yawSpeed);
 
@@ -232,7 +164,7 @@ static void sequenceTask()
         commanderSetSetpoint(&setpoint, 3);
       }
 
-      if (up < 80 && up > 0) {
+      if (up_o > 0 && up_o < 150) {
         state = stopping;
         DEBUG_PRINT("STOPPED BY UP SENSOR\n");
       }
@@ -255,8 +187,19 @@ static void sequenceTask()
         state = unlocked;
       }
 
-      if (state == idle || state == stopping) {
+      if (state == idle) {
         memset(&setpoint, 0, sizeof(setpoint_t));
+        commanderSetSetpoint(&setpoint, 3);
+      }
+
+      if (state == stopping) {
+        while (height > landing_height) {
+        	height -= 0.015;
+        	vTaskDelay(M2T(75));
+        	setHoverSetpoint(&setpoint, velFront, velSide, height, yawSpeed);
+        	commanderSetSetpoint(&setpoint, 3);
+        }
+    	memset(&setpoint, 0, sizeof(setpoint_t));
         commanderSetSetpoint(&setpoint, 3);
       }
     }
@@ -290,6 +233,6 @@ const DeckDriver sequence_deck = {
 DECK_DRIVER(sequence_deck);
 
 PARAM_GROUP_START(deck)
-PARAM_ADD(PARAM_FLOAT, height, &height_sp)
+PARAM_ADD(PARAM_FLOAT, height_sp, &height_sp)
 PARAM_GROUP_STOP(deck)
 
