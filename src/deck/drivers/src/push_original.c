@@ -43,9 +43,9 @@ typedef enum {
 
 typedef enum {
     running,
-    turn_left,
-    turn_right,
-	paused
+    obstacle,
+    scanning,
+	forward
 } Mode;
 
 static State state = idle;
@@ -57,7 +57,7 @@ static const uint16_t unlockThLow = 100;
 static const uint16_t unlockThHigh = 300;
 static const uint16_t stoppedTh = 300;
 
-static uint32_t launch_time =0;
+static uint32_t obst_time =0;
 static uint32_t scan_time =0;
 
 static uint16_t idUp = 0;
@@ -126,12 +126,14 @@ static void sequenceTask()
   factor = velMax/radius;
   max_bias = 0.3f;
   yawFactor=65.0/(1500-radius);
+  obst_time = xTaskGetTickCount();
+  scan_time = xTaskGetTickCount();
   //DEBUG_PRINT("%i", idUp);
 
   DEBUG_PRINT("Waiting for activation ...\n");
 
   while(1) {
-    vTaskDelay(M2T(40));
+    vTaskDelay(M2T(25));
     //DEBUG_PRINT(".");
     up = logGetUint(idUp);
     if (state == unlocked) {
@@ -146,41 +148,16 @@ static void sequenceTask()
       l_comp = (-1) * left_o * factor;
       r_comp = right_o * factor;
       velSide = r_comp + l_comp;
-//      velSide=0;
 
       front_o = radius - MIN(front, radius);
       back_o = radius - MIN(back, radius);
       f_comp = (-1) * front_o * factor;
       b_comp = back_o * factor;
       velFront = b_comp + f_comp;
-//      velFront=0;
 
       up_o = 0.2 * up + 0.8 * up_o;
       height = height_sp; // - up_o/400.0f;
 
-
-      if (mode == running ) {
-    	  if (xTaskGetTickCount() - launch_time > 5000) {
-    		  mode = turn_left;
-    		  scan_time = xTaskGetTickCount();
-    	  }
-      }
-
-      if (mode == turn_left ) {
-    	  	  yawSpeed = 30.0;
-          	  if (xTaskGetTickCount() - scan_time > 1750) {
-          		  scan_time = xTaskGetTickCount();
-          		  mode = turn_right;
-          	  }
-      }
-
-      if (mode == turn_right ) {
-    	  	  yawSpeed = -30.0;
-          	  if (xTaskGetTickCount() - scan_time > 1750) {
-          		  scan_time = xTaskGetTickCount();
-          		  mode = turn_left;
-          	  }
-      }
       //DEBUG_PRINT("collision f=%i, l=%i, r=%i, f_vel=%f, yaw=%f\n", front, left, right, velFront, yawSpeed);
 
       if (1) {
@@ -208,7 +185,6 @@ static void sequenceTask()
 
       if (up > unlockThHigh && state == lowUnlock) {
         DEBUG_PRINT("Unlocked!\n");
-        launch_time = xTaskGetTickCount();
         state = unlocked;
       }
 
@@ -218,12 +194,9 @@ static void sequenceTask()
       }
 
       if (state == stopping) {
-    	yawSpeed = 0.0;
-    	velFront = 0.0;
-    	velSide = 0.0;
         while (height > landing_height) {
         	height -= 0.015;
-        	vTaskDelay(M2T(60));
+        	vTaskDelay(M2T(75));
         	setHoverSetpoint(&setpoint, velFront, velSide, height, yawSpeed);
         	commanderSetSetpoint(&setpoint, 3);
         }
