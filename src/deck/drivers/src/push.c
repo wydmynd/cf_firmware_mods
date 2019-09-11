@@ -193,6 +193,14 @@ static void sequenceTask()
         DEBUG_PRINT("STOPPED BY UP SENSOR\n");
       }
 
+      if (emergencyStop==1) {
+        DEBUG_PRINT("EMERGENCY STOP RQ!\n");
+        while (1) {
+        	memset(&setpoint, 0, sizeof(setpoint_t));
+        	commanderSetSetpoint(&setpoint, 3);
+        	vTaskDelay(M2T(60));
+        }
+      }
     } else {
 
 //      if (state == stopping && up > stoppedTh) {
@@ -232,14 +240,8 @@ static void sequenceTask()
 
       }
 
-      if (emergencyStop>0) {
-        DEBUG_PRINT("EMERGENCY STOP RQ!\n");
-        while (1) {
-        	memset(&setpoint, 0, sizeof(setpoint_t));
-        	commanderSetSetpoint(&setpoint, 3);
-        	vTaskDelay(M2T(60));
-        }
-      }
+
+
 
     }
   }
