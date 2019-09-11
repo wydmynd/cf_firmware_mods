@@ -229,11 +229,16 @@ static void sequenceTask()
         }
     	memset(&setpoint, 0, sizeof(setpoint_t));
         commanderSetSetpoint(&setpoint, 3);
+
       }
 
       if (emergencyStop>0) {
         DEBUG_PRINT("EMERGENCY STOP RQ!\n");
-    	state = idle;
+        while (1) {
+        	memset(&setpoint, 0, sizeof(setpoint_t));
+        	commanderSetSetpoint(&setpoint, 3);
+        	vTaskDelay(M2T(60));
+        }
       }
 
     }
